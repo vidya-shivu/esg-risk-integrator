@@ -23,7 +23,7 @@ def describe():
     if not data or "text" not in data:
         return jsonify({"error": "Missing 'text' field"}), 400
 
-    # ✅ APPLY SANITIZATION HERE (fixed placement)
+    # ✅ APPLY SANITIZATION HERE
     user_input = clean_input(data["text"]).strip()
 
     if not user_input:
@@ -31,16 +31,16 @@ def describe():
 
     print("INPUT:", user_input)
 
-    # ✅ Load prompt (unchanged)
+    # ✅ Load prompt
     prompt_template = Path("prompts/describe_prompt.txt").read_text()
     prompt = prompt_template.replace("{input}", user_input)
 
-    # ✅ Call AI (unchanged)
+    # ✅ Call AI
     ai_response = call_groq(prompt)
 
     print("RAW AI:", ai_response)
 
-    # ✅ Fallback (unchanged)
+    # ✅ Fallback
     if not ai_response:
         return jsonify({
             "analysis": {
@@ -54,21 +54,20 @@ def describe():
                 },
                 "explanation": "Fallback response due to AI service unavailability"
             },
+            "is_fallback": True,
             "source": "fallback",
             "generated_at": datetime.utcnow().isoformat()
         })
 
-    # ✅ Extract JSON (unchanged)
-    match = re.search(r"\{.*\}", ai_response, re.DOTALL)
-
-    if not match:
-        return jsonify({
-            "error": "No valid JSON object found",
-            "raw": ai_response
-        }), 500
-
+    # 🔥 FIXED JSON EXTRACTION (balanced braces method)
     try:
-        cleaned_json = match.group()
+        start = ai_response.find("{")
+        end = ai_response.rfind("}")
+
+        if start == -1 or end == -1:
+            raise ValueError("No JSON found")
+
+        cleaned_json = ai_response[start:end+1]
 
         # Fix common AI issues
         cleaned_json = cleaned_json.replace(",}", "}").replace(",]", "]")
@@ -82,7 +81,7 @@ def describe():
             "raw": ai_response
         }), 500
 
-    # ✅ Validate structure (unchanged)
+    # ✅ Validate structure
     required_keys = ["category", "severity", "summary", "impact", "explanation"]
 
     if not all(key in result for key in required_keys):
@@ -91,7 +90,6 @@ def describe():
             "raw": result
         }), 500
 
-    # ✅ Final response (unchanged)
     return jsonify({
         "analysis": result,
         "source": "ai",

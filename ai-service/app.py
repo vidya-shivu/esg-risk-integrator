@@ -6,13 +6,10 @@ from services.groq_client import response_times
 from datetime import datetime
 import time
 
-# ✅ Create app (ONLY ONCE)
 app = Flask(__name__)
 
-# ✅ Track start time
 start_time = time.time()
 
-# ✅ Security headers (ONLY ONE)
 @app.after_request
 def add_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -22,12 +19,10 @@ def add_security_headers(response):
     response.headers['Content-Security-Policy'] = "default-src 'self'"
     return response
 
-# ✅ Register routes
 app.register_blueprint(describe_bp)
 app.register_blueprint(recommend_bp)
 app.register_blueprint(report_bp)
 
-# ✅ Health endpoint
 @app.route('/health')
 def health():
 
@@ -37,6 +32,10 @@ def health():
     if response_times:
         avg_time = sum(response_times) / len(response_times)
 
+        # 🔥 ADDED (memory optimization)
+        if len(response_times) > 50:
+            response_times.pop(0)
+
     return {
         "status": "ok",
         "model": "llama-3.1-8b-instant",
@@ -44,6 +43,5 @@ def health():
         "avg_response_time_ms": round(avg_time, 2)
     }
 
-# ✅ Run server (FIXED)
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000)

@@ -23,3 +23,4 @@ STRICT RULES:
 - No extra text or explanation outside JSON
 - Ensure valid JSON (no trailing commas)
 - Keep responses realistic and professional
+- Return ONLY ONE JSON object. Do not generate multiple JSON outputs.

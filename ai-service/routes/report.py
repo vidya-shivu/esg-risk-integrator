@@ -11,7 +11,6 @@ report_bp = Blueprint("report", __name__)
 @report_bp.route("/generate-report", methods=["POST"])
 def generate_report():
 
-    # ✅ STEP 3: JSON VALIDATION ADDED
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 400
 
@@ -34,6 +33,7 @@ def generate_report():
 
     print("RAW AI:", ai_response)
 
+    # ✅ Fallback (UPDATED)
     if not ai_response:
         return jsonify({
             "title": "ESG Risk Report",
@@ -41,6 +41,7 @@ def generate_report():
             "overview": "AI service unavailable",
             "key_items": ["Data unavailable"],
             "recommendations": [],
+            "is_fallback": True,   # 🔥 ADDED
             "source": "fallback",
             "generated_at": datetime.utcnow().isoformat()
         })

@@ -10,13 +10,11 @@ recommend_bp = Blueprint("recommend", __name__)
 @recommend_bp.route("/recommend", methods=["POST"])
 def recommend():
 
-    # ✅ STEP 3: JSON VALIDATION ADDED
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 400
 
     data = request.get_json()
 
-    # ✅ EXISTING VALIDATION (kept)
     if not data or "text" not in data:
         return jsonify({"error": "Missing 'text' field"}), 400
 
@@ -34,6 +32,7 @@ def recommend():
 
     print("RAW AI:", ai_response)
 
+    # ✅ Fallback (UPDATED)
     if not ai_response:
         return jsonify({
             "recommendations": [
@@ -53,6 +52,7 @@ def recommend():
                     "priority": "High"
                 }
             ],
+            "is_fallback": True,   # 🔥 ADDED
             "source": "fallback"
         })
 
