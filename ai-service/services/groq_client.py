@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # ✅ Load env
 load_dotenv()
 
-print("API KEY:", os.getenv("GROQ_API_KEY"))
+#print("API KEY:", os.getenv("GROQ_API_KEY"))
 
 # ✅ Groq client
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))

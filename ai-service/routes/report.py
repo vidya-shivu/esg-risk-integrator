@@ -4,35 +4,36 @@ from pathlib import Path
 from services.groq_client import call_groq
 import json
 import re
+from utils.sanitizer import clean_input
 
 report_bp = Blueprint("report", __name__)
 
 @report_bp.route("/generate-report", methods=["POST"])
 def generate_report():
 
+    # ✅ STEP 3: JSON VALIDATION ADDED
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
     data = request.get_json()
 
-    # ✅ 1. Validate input
     if not data or "text" not in data:
         return jsonify({"error": "Missing 'text' field"}), 400
 
-    user_input = data["text"].strip()
+    user_input = clean_input(data["text"]).strip()
 
     if not user_input:
         return jsonify({"error": "Empty input"}), 400
 
     print("INPUT:", user_input)
 
-    # ✅ 2. Load prompt
     prompt_template = Path("prompts/report_prompt.txt").read_text()
     prompt = prompt_template.replace("{input}", user_input)
 
-    # ✅ 3. Call AI
     ai_response = call_groq(prompt)
 
     print("RAW AI:", ai_response)
 
-    # ✅ 4. Fallback
     if not ai_response:
         return jsonify({
             "title": "ESG Risk Report",
@@ -44,7 +45,6 @@ def generate_report():
             "generated_at": datetime.utcnow().isoformat()
         })
 
-    # ✅ 5. Extract JSON
     match = re.search(r"\{.*\}", ai_response, re.DOTALL)
 
     if not match:
@@ -56,7 +56,6 @@ def generate_report():
     try:
         cleaned_json = match.group()
         cleaned_json = cleaned_json.replace(",}", "}").replace(",]", "]")
-
         result = json.loads(cleaned_json)
 
     except Exception as e:
@@ -66,7 +65,6 @@ def generate_report():
             "raw": ai_response
         }), 500
 
-    # ✅ 6. Validate structure
     required_keys = ["title", "summary", "overview", "key_items", "recommendations"]
 
     if not all(key in result for key in required_keys):
@@ -75,7 +73,6 @@ def generate_report():
             "raw": result
         }), 500
 
-    # ✅ 7. Final response
     return jsonify({
         **result,
         "source": "ai",

@@ -4,35 +4,43 @@ from pathlib import Path
 from services.groq_client import call_groq
 import json
 import re
+from utils.sanitizer import clean_input
 
 describe_bp = Blueprint("describe", __name__)
 
 @describe_bp.route("/describe", methods=["POST"])
 def describe():
 
+    # ✅ STEP 3: STRICT JSON VALIDATION
+    if not request.is_json:
+        return jsonify({
+            "error": "Request must be JSON"
+        }), 400
+
     data = request.get_json()
 
-    # ✅ 1. Validate input
+    # ✅ EXISTING VALIDATION (kept)
     if not data or "text" not in data:
         return jsonify({"error": "Missing 'text' field"}), 400
 
-    user_input = data["text"].strip()
+    # ✅ APPLY SANITIZATION HERE (fixed placement)
+    user_input = clean_input(data["text"]).strip()
 
     if not user_input:
         return jsonify({"error": "Empty input"}), 400
 
     print("INPUT:", user_input)
 
-    # ✅ 2. Load prompt
+    # ✅ Load prompt (unchanged)
     prompt_template = Path("prompts/describe_prompt.txt").read_text()
     prompt = prompt_template.replace("{input}", user_input)
 
-    # ✅ 3. Call AI
+    # ✅ Call AI (unchanged)
     ai_response = call_groq(prompt)
 
     print("RAW AI:", ai_response)
 
-    # ✅ 4. Fallback (no crash system)
+    # ✅ Fallback (unchanged)
     if not ai_response:
         return jsonify({
             "analysis": {
@@ -50,7 +58,7 @@ def describe():
             "generated_at": datetime.utcnow().isoformat()
         })
 
-    # ✅ 5. Extract JSON safely
+    # ✅ Extract JSON (unchanged)
     match = re.search(r"\{.*\}", ai_response, re.DOTALL)
 
     if not match:
@@ -74,7 +82,7 @@ def describe():
             "raw": ai_response
         }), 500
 
-    # ✅ 6. Validate structure
+    # ✅ Validate structure (unchanged)
     required_keys = ["category", "severity", "summary", "impact", "explanation"]
 
     if not all(key in result for key in required_keys):
@@ -83,7 +91,7 @@ def describe():
             "raw": result
         }), 500
 
-    # ✅ 7. Final response (PRO FORMAT)
+    # ✅ Final response (unchanged)
     return jsonify({
         "analysis": result,
         "source": "ai",

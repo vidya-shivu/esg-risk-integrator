@@ -3,35 +3,37 @@ from pathlib import Path
 from services.groq_client import call_groq
 import json
 import re
+from utils.sanitizer import clean_input
 
 recommend_bp = Blueprint("recommend", __name__)
 
 @recommend_bp.route("/recommend", methods=["POST"])
 def recommend():
 
+    # ✅ STEP 3: JSON VALIDATION ADDED
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
     data = request.get_json()
 
-    # ✅ 1. Validate input
+    # ✅ EXISTING VALIDATION (kept)
     if not data or "text" not in data:
         return jsonify({"error": "Missing 'text' field"}), 400
 
-    user_input = data["text"].strip()
+    user_input = clean_input(data["text"]).strip()
 
     if not user_input:
         return jsonify({"error": "Empty input"}), 400
 
     print("INPUT:", user_input)
 
-    # ✅ 2. Load prompt
     prompt_template = Path("prompts/recommend_prompt.txt").read_text()
     prompt = prompt_template.replace("{input}", user_input)
 
-    # ✅ 3. Call AI
     ai_response = call_groq(prompt)
 
     print("RAW AI:", ai_response)
 
-    # ✅ 4. Fallback (no crash system)
     if not ai_response:
         return jsonify({
             "recommendations": [
@@ -54,7 +56,6 @@ def recommend():
             "source": "fallback"
         })
 
-    # ✅ 5. Extract JSON array safely
     match = re.search(r"\[.*\]", ai_response, re.DOTALL)
 
     if not match:
@@ -65,10 +66,7 @@ def recommend():
 
     try:
         cleaned_json = match.group()
-
-        # Fix common AI mistakes
         cleaned_json = cleaned_json.replace(",]", "]")
-
         result = json.loads(cleaned_json)
 
     except Exception as e:
@@ -78,7 +76,6 @@ def recommend():
             "raw": ai_response
         }), 500
 
-    # ✅ 6. Validate structure
     if not isinstance(result, list) or len(result) != 3:
         return jsonify({
             "error": "AI did not return exactly 3 recommendations",
@@ -92,7 +89,6 @@ def recommend():
                 "raw": result
             }), 500
 
-    # ✅ 7. Final clean response
     return jsonify({
         "recommendations": result,
         "source": "ai"
