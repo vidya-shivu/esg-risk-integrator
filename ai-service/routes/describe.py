@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime
 from pathlib import Path
 from services.groq_client import call_groq
+from services.chroma_service import search_esg_knowledge
 import json
 import re
 from utils.sanitizer import clean_input
@@ -33,7 +34,23 @@ def describe():
 
     # ✅ Load prompt
     prompt_template = Path("prompts/describe_prompt.txt").read_text()
-    prompt = prompt_template.replace("{input}", user_input)
+
+    # 🔥 NEW — SEARCH ESG KNOWLEDGE USING CHROMADB
+    knowledge = search_esg_knowledge(user_input)
+
+    # 🔥 Convert knowledge list into readable context
+    context = "\n".join(knowledge)
+
+    # 🔥 ENHANCED PROMPT WITH RAG CONTEXT
+    enhanced_input = f"""
+User Input:
+{user_input}
+
+Relevant ESG Knowledge:
+{context}
+"""
+
+    prompt = prompt_template.replace("{input}", enhanced_input)
 
     # ✅ Call AI
     ai_response = call_groq(prompt)
@@ -69,7 +86,7 @@ def describe():
 
         cleaned_json = ai_response[start:end+1]
 
-        # Fix common AI issues
+        # ✅ Fix common AI formatting issues
         cleaned_json = cleaned_json.replace(",}", "}").replace(",]", "]")
 
         result = json.loads(cleaned_json)
@@ -82,7 +99,13 @@ def describe():
         }), 500
 
     # ✅ Validate structure
-    required_keys = ["category", "severity", "summary", "impact", "explanation"]
+    required_keys = [
+        "category",
+        "severity",
+        "summary",
+        "impact",
+        "explanation"
+    ]
 
     if not all(key in result for key in required_keys):
         return jsonify({
@@ -90,6 +113,7 @@ def describe():
             "raw": result
         }), 500
 
+    # ✅ Final clean response
     return jsonify({
         "analysis": result,
         "source": "ai",
