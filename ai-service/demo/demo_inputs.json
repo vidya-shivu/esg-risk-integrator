@@ -1,0 +1,17 @@
+[
+    {
+      "company": "GreenFuture Energy",
+      "sector": "Renewable Energy",
+      "issue": "High water consumption in manufacturing plants"
+    },
+    {
+      "company": "UrbanTextiles Ltd",
+      "sector": "Textile",
+      "issue": "Worker safety incidents increasing"
+    },
+    {
+      "company": "EcoMining Corp",
+      "sector": "Mining",
+      "issue": "Carbon emissions above industry standards"
+    }
+  ]

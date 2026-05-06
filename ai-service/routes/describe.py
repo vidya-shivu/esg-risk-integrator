@@ -3,16 +3,20 @@ from datetime import datetime
 from pathlib import Path
 from services.groq_client import call_groq
 from services.chroma_service import search_esg_knowledge
-import json
-import re
+from services.demo_metrics import track_demo_response
 from utils.sanitizer import clean_input
+
+import json
+import time
 
 describe_bp = Blueprint("describe", __name__)
 
 @describe_bp.route("/describe", methods=["POST"])
 def describe():
 
-    # ✅ STEP 3: STRICT JSON VALIDATION
+    start_time = time.time()
+
+    # ✅ Validate JSON request
     if not request.is_json:
         return jsonify({
             "error": "Request must be JSON"
@@ -20,28 +24,43 @@ def describe():
 
     data = request.get_json()
 
-    # ✅ EXISTING VALIDATION (kept)
-    if not data or "text" not in data:
-        return jsonify({"error": "Missing 'text' field"}), 400
+    # ✅ Validate request body
+    if not data:
+        return jsonify({
+            "error": "Request body is required"
+        }), 400
 
-    # ✅ APPLY SANITIZATION HERE
-    user_input = clean_input(data["text"]).strip()
+    # ✅ Support BOTH formats
+    if "text" in data:
+        user_input = clean_input(data["text"]).strip()
 
+    else:
+        company = clean_input(data.get("company", ""))
+        sector = clean_input(data.get("sector", ""))
+        issue = clean_input(data.get("issue", ""))
+
+        user_input = f"""
+Company: {company}
+Sector: {sector}
+Issue: {issue}
+""".strip()
+
+    # ✅ Empty validation
     if not user_input:
-        return jsonify({"error": "Empty input"}), 400
+        return jsonify({
+            "error": "Empty input"
+        }), 400
 
     print("INPUT:", user_input)
 
     # ✅ Load prompt
     prompt_template = Path("prompts/describe_prompt.txt").read_text()
 
-    # 🔥 NEW — SEARCH ESG KNOWLEDGE USING CHROMADB
+    # ✅ ChromaDB retrieval
     knowledge = search_esg_knowledge(user_input)
 
-    # 🔥 Convert knowledge list into readable context
     context = "\n".join(knowledge)
 
-    # 🔥 ENHANCED PROMPT WITH RAG CONTEXT
     enhanced_input = f"""
 User Input:
 {user_input}
@@ -52,10 +71,12 @@ Relevant ESG Knowledge:
 
     prompt = prompt_template.replace("{input}", enhanced_input)
 
-    # ✅ Call AI
+    # ✅ Call Groq
     ai_response = call_groq(prompt)
 
     print("RAW AI:", ai_response)
+
+    response_time = track_demo_response(start_time)
 
     # ✅ Fallback
     if not ai_response:
@@ -73,10 +94,11 @@ Relevant ESG Knowledge:
             },
             "is_fallback": True,
             "source": "fallback",
-            "generated_at": datetime.utcnow().isoformat()
+            "generated_at": datetime.utcnow().isoformat(),
+            "response_time_seconds": response_time
         })
 
-    # 🔥 FIXED JSON EXTRACTION (balanced braces method)
+    # ✅ Extract JSON
     try:
         start = ai_response.find("{")
         end = ai_response.rfind("}")
@@ -84,9 +106,8 @@ Relevant ESG Knowledge:
         if start == -1 or end == -1:
             raise ValueError("No JSON found")
 
-        cleaned_json = ai_response[start:end+1]
+        cleaned_json = ai_response[start:end + 1]
 
-        # ✅ Fix common AI formatting issues
         cleaned_json = cleaned_json.replace(",}", "}").replace(",]", "]")
 
         result = json.loads(cleaned_json)
@@ -98,7 +119,7 @@ Relevant ESG Knowledge:
             "raw": ai_response
         }), 500
 
-    # ✅ Validate structure
+    # ✅ Validate AI response
     required_keys = [
         "category",
         "severity",
@@ -113,9 +134,10 @@ Relevant ESG Knowledge:
             "raw": result
         }), 500
 
-    # ✅ Final clean response
     return jsonify({
         "analysis": result,
         "source": "ai",
-        "generated_at": datetime.utcnow().isoformat()
+        "generated_at": datetime.utcnow().isoformat(),
+        "response_time_seconds": response_time,
+        "is_fallback": False
     })
