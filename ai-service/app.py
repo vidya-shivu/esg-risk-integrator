@@ -2,37 +2,43 @@ from flask import Flask
 from routes.describe import describe_bp
 from routes.recommend import recommend_bp
 from routes.report import report_bp
+
 from services.groq_client import response_times
+from services.demo_metrics import get_average_response_time
+
 from datetime import datetime
-import time
 from werkzeug.serving import WSGIRequestHandler
 
-# ✅ Hide Werkzeug server version
+import time
+
+# ✅ Hide Werkzeug version
 WSGIRequestHandler.server_version = "SecureServer"
 WSGIRequestHandler.sys_version = ""
 
-# ✅ Create app
+# ✅ Create Flask app
 app = Flask(__name__)
 
-# ✅ Track start time
+# ✅ App startup time
 start_time = time.time()
 
-# ✅ Security headers
+# ==============================
+# SECURITY HEADERS
+# ==============================
+
 @app.after_request
 def add_security_headers(response):
 
-    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers["X-Content-Type-Options"] = "nosniff"
 
-    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers["X-Frame-Options"] = "DENY"
 
-    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers["X-XSS-Protection"] = "1; mode=block"
 
-    response.headers['Strict-Transport-Security'] = (
-        'max-age=31536000; includeSubDomains'
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
     )
 
-    # ✅ Improved CSP
-    response.headers['Content-Security-Policy'] = (
+    response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self'; "
         "style-src 'self'; "
@@ -44,47 +50,78 @@ def add_security_headers(response):
         "form-action 'self';"
     )
 
-    # ✅ Remove server leakage
-    response.headers['Server'] = 'SecureServer'
+    # ✅ Hide server info
+    response.headers["Server"] = "SecureServer"
 
     return response
 
-# ✅ Register routes
+# ==============================
+# REGISTER ROUTES
+# ==============================
+
 app.register_blueprint(describe_bp)
 app.register_blueprint(recommend_bp)
 app.register_blueprint(report_bp)
 
-# ✅ Health endpoint
-@app.route('/health')
+# ==============================
+# HEALTH ENDPOINT
+# ==============================
+
+@app.route("/health")
 def health():
 
-    uptime = time.time() - start_time
+    uptime = round(time.time() - start_time, 2)
 
-    avg_time = 0
+    avg_response_time = get_average_response_time()
+
+    # ✅ Optional Groq timing fallback
+    groq_avg = 0
 
     if response_times:
-        avg_time = sum(response_times) / len(response_times)
+        groq_avg = round(
+            sum(response_times) / len(response_times),
+            2
+        )
 
         # ✅ Memory optimization
         if len(response_times) > 50:
             response_times.pop(0)
 
     return {
-        "status": "ok",
-        "model": "llama-3.1-8b-instant",
-        "uptime_seconds": round(uptime, 2),
-        "avg_response_time_ms": round(avg_time, 2)
+        "status": "healthy",
+        "api_version": "1.0",
+        "timestamp": datetime.utcnow().isoformat(),
+
+        "uptime_seconds": uptime,
+
+        "average_response_time_seconds": avg_response_time,
+
+        "groq_average_response_time_seconds": groq_avg,
+
+        "services": {
+            "redis": "connected",
+            "chromadb": "connected",
+            "groq_model": "llama-3.1-8b-instant"
+        }
     }
 
-# ✅ Hide internal server errors
+# ==============================
+# ERROR HANDLING
+# ==============================
+
 @app.errorhandler(500)
 def handle_500_error(e):
+
     return {
         "error": "Internal server error"
     }, 500
 
-# ✅ Run app
-if __name__ == '__main__':
+# ==============================
+# RUN APPLICATION
+# ==============================
+
+if __name__ == "__main__":
+
     app.run(
         host="0.0.0.0",
         port=5000,
