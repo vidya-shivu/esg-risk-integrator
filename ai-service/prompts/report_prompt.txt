@@ -29,3 +29,25 @@ STRICT RULES:
 - No extra text
 - Ensure valid JSON
 - Provide realistic and professional output
+Generate a professional ESG analysis report in strict JSON format.
+
+Required JSON structure:
+{{
+  "title": "ESG Report",
+  "summary": "...",
+  "overview": "...",
+  "risks": ["...", "..."],
+  "recommendations": ["...", "..."]
+}}
+
+Rules:
+- Always return valid JSON only
+- No markdown formatting
+- No code blocks
+- No explanations outside JSON
+- Base analysis on provided ESG scores:
+Environmental: {E}
+Social: {S}
+Governance: {G}
+
+Ensure recommendations are realistic, actionable, and aligned with sustainability best practices.
