@@ -5,34 +5,67 @@ from routes.report import report_bp
 from services.groq_client import response_times
 from datetime import datetime
 import time
+from werkzeug.serving import WSGIRequestHandler
 
+# ✅ Hide Werkzeug server version
+WSGIRequestHandler.server_version = "SecureServer"
+WSGIRequestHandler.sys_version = ""
+
+# ✅ Create app
 app = Flask(__name__)
 
+# ✅ Track start time
 start_time = time.time()
 
+# ✅ Security headers
 @app.after_request
 def add_security_headers(response):
+
     response.headers['X-Content-Type-Options'] = 'nosniff'
+
     response.headers['X-Frame-Options'] = 'DENY'
+
     response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    response.headers['Content-Security-Policy'] = "default-src 'self'"
+
+    response.headers['Strict-Transport-Security'] = (
+        'max-age=31536000; includeSubDomains'
+    )
+
+    # ✅ Improved CSP
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self';"
+    )
+
+    # ✅ Remove server leakage
+    response.headers['Server'] = 'SecureServer'
+
     return response
 
+# ✅ Register routes
 app.register_blueprint(describe_bp)
 app.register_blueprint(recommend_bp)
 app.register_blueprint(report_bp)
 
+# ✅ Health endpoint
 @app.route('/health')
 def health():
 
     uptime = time.time() - start_time
 
     avg_time = 0
+
     if response_times:
         avg_time = sum(response_times) / len(response_times)
 
-        # 🔥 ADDED (memory optimization)
+        # ✅ Memory optimization
         if len(response_times) > 50:
             response_times.pop(0)
 
@@ -43,5 +76,17 @@ def health():
         "avg_response_time_ms": round(avg_time, 2)
     }
 
+# ✅ Hide internal server errors
+@app.errorhandler(500)
+def handle_500_error(e):
+    return {
+        "error": "Internal server error"
+    }, 500
+
+# ✅ Run app
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000)
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=False
+    )
